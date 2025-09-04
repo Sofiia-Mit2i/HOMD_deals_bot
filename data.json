@@ -1,25 +1,27 @@
 {
-  "казахстан": [
-    "@manager_kz1",
-    "@manager_kz2"
+  "admins": [
+    333192979
   ],
-  "испания": [
-    "@manager_es1",
-    "@manager_es2"
-  ],
-  "германия": [
-    "@manager_de1"
-  ],
-  "италия": [
-    "@itmanger"
-  ],
-  "франция": [
-    "@francemanger"
-  ],
-  "америка": [
-    "@usman"
-  ],
-  "польша": [
-    "@plmanager"
-  ]
+  "geo": {
+    "казахстан": [
+      "@manager_kz1",
+      "@manager_kz2"
+    ],
+    "испания": [
+      "@manager_es1",
+      "@manager_es2"
+    ],
+    "германия": [
+      "@manager_de1"
+    ],
+    "италия": [
+      "@itmanger"
+    ],
+    "франция": [
+      "@francemanger"
+    ],
+    "америка": [
+      "@usman"
+    ]
+  }
 }
