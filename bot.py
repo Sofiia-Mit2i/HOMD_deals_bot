@@ -12,6 +12,9 @@ from aiogram import F
 from supabase import create_client
 from rapidfuzz import process, fuzz
 from dotenv import load_dotenv
+
+from getexcel import send_team_excel, get_team_by_user_id
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -230,11 +233,28 @@ async def handle_geos(message: types.Message):
         reply_parts.append(f"❌ No managers found for {word}")
 
     reply_text = "\n".join(reply_parts)
+    if correct_geos:
+        footer = "\n\n✅ Next steps\n" \
+                " • Please message each contact separately (so nothing gets missed).\n" \
+                " • They'll help with the best deals for your GEOs as soon as possible.\n" \
+                " • If anything looks off or a link doesn't work, ping @racketwoman.\n" \
+                "Great to (e-)meet you—have a fantastic day! 🙌"
+        reply_text += footer
+
     await message.reply(reply_text)
 
     # ----------------------- Startup -----------------------
 # Replace the main() function at the bottom of the file with:
 
+@dp.message(Command("download"))
+async def handle_download(message: types.Message):
+    try:
+        logger.info(f"Download requested by user {message.from_user.id}")
+        await send_team_excel(message, supabase)
+    except Exception as e:
+        logger.error(f"Error handling download: {str(e)}")
+        await message.reply("❌ An error occurred while processing your request.")
+    
 async def main():
     # Initialize Bot instance with a default parse mode
     bot = Bot(token=TELEGRAM_TOKEN)
@@ -243,8 +263,9 @@ async def main():
     # Register all handlers
     dp.message.register(cmd_start, Command(commands=["start"]))
     dp.callback_query.register(geo_button, F.data == "geo")
-    dp.message.register(handle_geos, F.text)
-    
+    dp.message.register(handle_geos, lambda message: message.text and not message.text.startswith('/'))
+    dp.message.register(handle_download, Command("download"))
+
     # Start polling
     logger.info("🤖 Bot started...")
     await dp.start_polling(bot)
