@@ -40,7 +40,8 @@ except Exception as e:
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-WEBHOOK_HOST = os.getenv("https://homd-deals-bot-jsx7.onrender.com")  # твой Render-домен, например: https://mybot.onrender.com
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "https://homd-deals-bot-jsx7.onrender.com")
+ # твой Render-домен, например: https://mybot.onrender.com
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
@@ -156,24 +157,37 @@ async def delete_handler(message: types.Message):
     """Wrapper function for delete_contact command"""
     await delete_contact(message, supabase)
 
-async def download_all_wrapper(callback: types.CallbackQuery):
-    await download_all_callback(callback, supabase)
+async def download_all_callback(callback: types.CallbackQuery):
+    if not await is_admin(callback.from_user.id):
+        await callback.answer("❌ У вас нет прав для этой команды.", show_alert=True)
+        return
+    from handlers.excel import send_team_excel
+    await send_team_excel(callback.message, supabase)
+    await callback.answer()
 
-async def start_web_app():
-    async def handle(request):
+async def on_startup(bot: Bot):
+    await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
+    logger.info(f"Webhook set to {WEBHOOK_URL}")
+
+async def on_shutdown(bot: Bot):
+    await bot.delete_webhook()
+    logger.info("Webhook deleted")
+
+
+def setup_routes(app: web.Application, dp: Dispatcher, bot: Bot):
+    async def handle(request: web.Request):
         return web.Response(text="Bot is running")
-    app = web.Application()
+
+    async def webhook_handler(request: web.Request):
+        update = await request.json()
+        await dp.feed_webhook_update(bot, update)
+        return web.Response()
+
     app.router.add_get("/", handle)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, port=int(os.environ.get("PORT", 8000)))
-    await site.start()
-    logger.info(f"Web server started on port {os.environ.get('PORT', 8000)}")
+    app.router.add_post(WEBHOOK_PATH, webhook_handler)
 
 async def main():
-    # Initialize Bot instance
-    TOKEN = os.getenv("TELEGRAM_TOKEN")
-    bot = Bot(token=TOKEN)
+    bot = Bot(token=TELEGRAM_TOKEN)
     dp = Dispatcher()
     
     # Register all handlers
@@ -190,16 +204,18 @@ async def main():
     dp.message.register(add_handler, Command("add"))
     dp.message.register(delete_handler, Command("delete"))
 
-    dp.callback_query.register(
-    download_all_wrapper,
-    lambda c: c.data == "download_all"
-)
-    asyncio.create_task(start_web_app())
+    dp.callback_query.register(download_all_callback, lambda c: c.data == "download_all")
+# Create aiohttp app
+    app = web.Application()
+    setup_routes(app, dp, bot)
 
-    
-    # Start polling
-    logger.info("🤖 Bot started...")
-    await dp.start_polling(bot)
+    # Startup/shutdown hooks
+    app.on_startup.append(lambda _: on_startup(bot))
+    app.on_shutdown.append(lambda _: on_shutdown(bot))
+
+    port = int(os.environ.get("PORT", 8000))
+    logger.info(f"Starting bot on port {port}")
+    web.run_app(app, port=port)
 
 if __name__ == "__main__":
     try:
