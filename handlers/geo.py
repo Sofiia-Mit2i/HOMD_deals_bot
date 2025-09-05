@@ -102,12 +102,14 @@ async def handle_geos(message: types.Message, supabase, COUNTRY_MAP):
         
         # Add footer if there were any correct GEOs
         if correct_geos:
-            footer = "\n\n✅ Next steps\n" \
-                    " • Please message each contact separately (so nothing gets missed).\n" \
-                    " • They'll help with the best deals for your GEOs as soon as possible.\n" \
-                    " • If anything looks off or a link doesn't work, ping @racketwoman.\n" \
-                    "Great to (e-)meet you—have a fantastic day! 🙌"
-            reply_text += footer
+            footer = (
+            "\n • IMPORTANT: DM each contact separately — every team has different offers and traffic from their own sites.\n"
+            " • They’ll help you with the best deals for your GEOs ASAP.\n"
+            " • If anything looks off or a link doesn’t work, ping @racketwoman\n"
+            " • Here is the message. Hey there 👋 I’m [Your Name] from [Brand]. "
+            "Our affiliate program: [URL]. We’re ready to talk GEOs and deal terms—when’s a good time for you?"
+        )
+        reply_text += footer
 
         await message.reply(reply_text)
         logger.info(f"Processed GEOs for user {message.from_user.id}: correct={correct_geos}, incorrect={incorrect_words}")
