@@ -10,8 +10,9 @@ from dotenv import load_dotenv
 
 from handlers.geo import handle_geos, normalize_geo
 from handlers import cmd_start, geo_button
-from handlers.excel import handle_download
+from handlers.excel import handle_download, handle_messages_download
 from handlers.other import handle_other_message
+from admin import is_admin
 
 # Configure logging
 logging.basicConfig(
@@ -79,6 +80,11 @@ async def download_handler(message: types.Message):
     """Wrapper function for handle_download to properly pass supabase"""
     await handle_download(message, supabase)
 
+async def messages_handler(message: types.Message):
+    """Wrapper function for handle_messages_download to properly pass supabase"""
+    await handle_messages_download(message, supabase)
+
+
 
 async def main():
     # Initialize Bot instance
@@ -89,6 +95,7 @@ async def main():
     dp.message.register(cmd_start, Command(commands=["start"]))
     dp.callback_query.register(geo_button, F.data == "geo")
     dp.message.register(download_handler, Command("download"))
+    dp.message.register(messages_handler, Command("messages"))
     dp.message.register(
         message_handler,  # Use the wrapper function instead of lambda
         lambda message: message.text and not message.text.startswith('/')
