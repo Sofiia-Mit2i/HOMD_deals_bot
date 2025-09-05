@@ -4,21 +4,22 @@ from admin import is_admin
 
 logger = logging.getLogger(__name__)
 
-def normalize_value(value):
+def normalize_value(value, numeric=False):
     """
-    Универсальный хелпер для Supabase:
-    - если значение похоже на массив (text[]), вернем [value]
-    - иначе оставляем строку
+    Приводим данные к массиву для Supabase
     """
-    # допустим, мы пока не знаем тип -> подстрахуемся
     if isinstance(value, list):
         return value
-    return value
+    if numeric:
+        try:
+            return [int(value)]
+        except ValueError:
+            return [value]
+    return [value]
 
 async def change_contact(message: types.Message, supabase):
     """
-    Change contact for a given Team
-    Example: /change Team1 contact123 M_Id123 new_contact456 M_Id456
+    /change Team1 old_contact old_M_Id new_contact new_M_Id
     """
     if not await is_admin(message.from_user.id):
         await message.reply("❌ У вас нет прав для этой команды.")
@@ -26,20 +27,19 @@ async def change_contact(message: types.Message, supabase):
 
     try:
         parts = message.text.split()
-        if len(parts) < 5:
+        if len(parts) < 6:
             await message.reply("⚠️ Формат: /change Team1 old_contact old_M_Id new_contact new_M_Id")
             return
 
         _, team, old_contact, old_m_id, new_contact, new_m_id = parts
 
-        # Update in Supabase
         response = supabase.table("geo").update({
             "contact": normalize_value(new_contact),
-            "M_Id": normalize_value(new_m_id)
+            "M_Id": normalize_value(new_m_id, numeric=True)
         }).match({
             "team_name": team,
             "contact": normalize_value(old_contact),
-            "M_Id": normalize_value(old_m_id)
+            "M_Id": normalize_value(old_m_id, numeric=True)
         }).execute()
 
         if response.data:
@@ -53,8 +53,7 @@ async def change_contact(message: types.Message, supabase):
 
 async def add_contact(message: types.Message, supabase):
     """
-    Add new contact for a team
-    Example: /add Team1 contact123 M_Id123
+    /add Team1 new_contact new_M_Id
     """
     if not await is_admin(message.from_user.id):
         await message.reply("❌ У вас нет прав для этой команды.")
@@ -71,7 +70,7 @@ async def add_contact(message: types.Message, supabase):
         response = supabase.table("geo").insert({
             "team_name": team,
             "contact": normalize_value(contact),
-            "M_Id": normalize_value(m_id)
+            "M_Id": normalize_value(m_id, numeric=True)
         }).execute()
 
         await message.reply(f"✅ Контакт {contact} добавлен в {team}")
@@ -82,8 +81,7 @@ async def add_contact(message: types.Message, supabase):
 
 async def delete_contact(message: types.Message, supabase):
     """
-    Delete contact for a team
-    Example: /delete Team1 contact123 M_Id123
+    /delete Team1 contact M_Id
     """
     if not await is_admin(message.from_user.id):
         await message.reply("❌ У вас нет прав для этой команды.")
@@ -100,7 +98,7 @@ async def delete_contact(message: types.Message, supabase):
         response = supabase.table("geo").delete().match({
             "team_name": team,
             "contact": normalize_value(contact),
-            "M_Id": normalize_value(m_id)
+            "M_Id": normalize_value(m_id, numeric=True)
         }).execute()
 
         if response.data:
