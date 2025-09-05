@@ -62,6 +62,8 @@ def normalize_geo(user_words, COUNTRY_MAP):
     return correct, incorrect
 
 async def handle_geos(message: types.Message, supabase, COUNTRY_MAP):
+    logger.info(f"Correct GEOs: {correct_geos}, Incorrect: {incorrect_words}")
+
     """
     Handle incoming messages with GEO codes
     """

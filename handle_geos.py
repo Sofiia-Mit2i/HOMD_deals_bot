@@ -1,3 +1,4 @@
+""""
 from rapidfuzz import process, fuzz
 from datetime import datetime
 
@@ -35,3 +36,4 @@ async def log_user_request(supabase, user_id, username, geo_list):
                 "geo": geo,
                 "request_date": now
             }).execute()
+            """

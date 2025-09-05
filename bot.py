@@ -3,7 +3,7 @@ import os
 import asyncio
 import json
 from aiogram import Bot, Dispatcher,  types 
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandObject
 from aiogram import F
 from supabase import create_client
 from dotenv import load_dotenv
@@ -114,6 +114,7 @@ async def send_team_excel_from_callback(callback: types.CallbackQuery, supabase)
 
 
 async def message_handler(message: types.Message):
+    logger.info(f"message_handler получил: {message.text}")
     """Route messages to appropriate handlers"""
     try:
         text = message.text.strip()
@@ -194,11 +195,9 @@ def main():
     dp.message.register(cmd_start, Command(commands=["start"]))
     dp.callback_query.register(geo_button, F.data == "geo")
     dp.message.register(download_handler, Command("download"))
+    logger.info("Регистрируем обработчик для текстовых сообщений")
     dp.message.register(messages_handler, Command("messages"))
-    dp.message.register(
-        message_handler,  # Use the wrapper function instead of lambda
-        lambda message: message.text and not message.text.startswith('/')
-    )
+    dp.message.register(message_handler, F.text & ~F.text.startswith("/"))
 
     dp.message.register(change_handler, Command("change"))
     dp.message.register(add_handler, Command("add"))
