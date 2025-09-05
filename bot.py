@@ -16,7 +16,8 @@ from handlers.other import handle_other_message
 from adminpanel import change_contact, add_contact, delete_contact
 from admin import is_admin
 
-from aiohttp import request, web
+import asyncio
+from aiohttp import web
 
 # Configure logging
 logging.basicConfig(
@@ -195,22 +196,18 @@ def setup_routes(app: web.Application, dp: Dispatcher, bot: Bot):
 async def main():
     bot = Bot(token=TELEGRAM_TOKEN)
     dp = Dispatcher()
-    
-    # Register all handlers
+
+    # Регистрация всех обработчиков
     dp.message.register(cmd_start, Command(commands=["start"]))
     dp.callback_query.register(geo_button, F.data == "geo")
     dp.message.register(download_handler, Command("download"))
     dp.message.register(messages_handler, Command("messages"))
-    dp.message.register(
-        message_handler,  # Use the wrapper function instead of lambda
-        lambda message: message.text and not message.text.startswith('/')
-    )
-
+    dp.message.register(message_handler, lambda message: message.text and not message.text.startswith('/'))
     dp.message.register(change_handler, Command("change"))
     dp.message.register(add_handler, Command("add"))
     dp.message.register(delete_handler, Command("delete"))
-
     dp.callback_query.register(download_all_callback, lambda c: c.data == "download_all")
+
     app = web.Application()
     setup_routes(app, dp, bot)
     app.on_startup.append(lambda _: on_startup(bot))
@@ -227,5 +224,4 @@ async def main():
         await asyncio.sleep(3600)
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    asyncio.run(main())  # <-- запускаем только async main
