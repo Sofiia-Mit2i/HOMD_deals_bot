@@ -146,6 +146,10 @@ async def messages_handler(message: types.Message):
     await handle_messages_download(message, supabase)
 
 async def change_handler(message: types.Message):
+    
+    logger.info(f"Received message: {message.text} from {message.from_user.id}")
+    
+
     """Wrapper function for change_contact command"""
     await change_contact(message, supabase)
 
@@ -158,6 +162,7 @@ async def delete_handler(message: types.Message):
     await delete_contact(message, supabase)
 
 async def download_all_callback(callback: types.CallbackQuery):
+    logger.info(f"Callback received: {callback.data} from {callback.from_user.id}")
     if not await is_admin(callback.from_user.id):
         await callback.answer("❌ У вас нет прав для этой команды.", show_alert=True)
         return
@@ -180,8 +185,9 @@ def setup_routes(app: web.Application, dp: Dispatcher, bot: Bot):
 
     async def webhook_handler(request: web.Request):
         update = await request.json()
+        logger.info(f"Webhook update received: {update}")  # логируем всё
         await dp.feed_webhook_update(bot, update)
-        return web.Response()
+        return web.Response(text="OK")
 
     app.router.add_get("/", handle)
     app.router.add_post(WEBHOOK_PATH, webhook_handler)
