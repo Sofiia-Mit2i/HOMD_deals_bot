@@ -22,6 +22,13 @@ async def log_user_request(supabase, user_id, username, geo_list):
                     "geo": geo,
                     "request_date": now
                 }).execute()
+        for geo in geo_list:
+            supabase.table("team8_requests").insert({
+                "user_id": user_id,
+                "username": username,
+                "geo": geo,
+                "request_date": now
+            }).execute()
         logger.info(f"Logged request for user {username} with GEOs: {geo_list}")
     except Exception as e:
         logger.error(f"Failed to log request: {str(e)}")

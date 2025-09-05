@@ -81,16 +81,19 @@ async def handle_geos(message: types.Message, supabase, COUNTRY_MAP):
         reply_parts.append(f"❌ No managers found for {word}")
 
     reply_text = "\n".join(reply_parts)
+
     if correct_geos:
-        footer = "\n\n✅ Next steps\n" \
-                " • IMPORTANT: DM each contact separately — every team has different offers and traffic from their own sites.\n" \
-                " Here is the message.  Hey there 👋 I’m [Your Name] from [Brand]. Our affiliate program: [URL]. We’re ready to talk GEOs and deal terms—when’s a good time for you?" \
-                " • They’ll help you with the best deals for your GEOs ASAP.\n" \
-                " • If anything looks off or a link doesn’t work, ping @racketwoman\n" \
-                "Great to (e-)meet you—have a fantastic day! 🙌"
+        footer = (
+            "\n • IMPORTANT: DM each contact separately — every team has different offers and traffic from their own sites.\n"
+            " • They’ll help you with the best deals for your GEOs ASAP.\n"
+            " • If anything looks off or a link doesn’t work, ping @racketwoman\n"
+            " • Here is the message. Hey there 👋 I’m [Your Name] from [Brand]. "
+            "Our affiliate program: [URL]. We’re ready to talk GEOs and deal terms—when’s a good time for you?"
+        )
         reply_text += footer
 
     await message.reply(reply_text)
+
 
 # Export all handlers
 __all__ = ['cmd_start', 'geo_button', 'handle_geos', 'normalize_geo', 'log_user_request']

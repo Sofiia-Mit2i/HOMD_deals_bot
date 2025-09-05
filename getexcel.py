@@ -8,7 +8,7 @@ from admin import is_admin  # твоя проверка админов
 logger = logging.getLogger(__name__)
 
 # список всех команд (их имена совпадают с team_name в geo)
-TEAMS = ["Team1", "Team2", "Team3", "Team4", "Team5", "Team6", "Team7"]
+TEAMS = ["Team1", "Team2", "Team3", "Team4", "Team5", "Team6", "Team7", "Team8"]
 
 async def send_team_excel(message: types.Message, supabase):
     """

@@ -14,7 +14,6 @@ from handlers.excel import handle_download, handle_messages_download
 from handlers.other import handle_other_message
 
 from adminpanel import change_contact, add_contact, delete_contact
-from getexcel import send_team_excel  # импорт твоей функции
 from admin import is_admin
 
 # Configure logging
