@@ -8,12 +8,16 @@ from supabase import create_client, Client
 from rapidfuzz import process, fuzz
 from datetime import datetime
 
-"""from dotenv import load_dotenv
+from dotenv import load_dotenv
 load_dotenv()
-"""
+
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+
+if not all([SUPABASE_URL, SUPABASE_KEY, TELEGRAM_TOKEN]):
+    raise ValueError("Missing required environment variables. Please check SUPABASE_URL, SUPABASE_KEY, and TELEGRAM_TOKEN are set.")
+
 
 # подключение к Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
