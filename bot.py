@@ -2,8 +2,8 @@ import logging
 import os
 import asyncio
 import json
-from aiogram import Bot, Dispatcher,  types 
-from aiogram.filters import Command, CommandObject
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
 from aiogram import F
 from supabase import create_client
 from dotenv import load_dotenv
@@ -16,7 +16,7 @@ from handlers.other import handle_other_message
 from adminpanel import change_contact, add_contact, delete_contact
 from admin import is_admin
 
-from aiohttp import web
+from aiohttp import request, web
 
 # Configure logging
 logging.basicConfig(
@@ -114,7 +114,6 @@ async def send_team_excel_from_callback(callback: types.CallbackQuery, supabase)
 
 
 async def message_handler(message: types.Message):
-    logger.info(f"message_handler получил: {message.text}")
     """Route messages to appropriate handlers"""
     try:
         text = message.text.strip()
@@ -187,7 +186,7 @@ def setup_routes(app: web.Application, dp: Dispatcher, bot: Bot):
     app.router.add_get("/", handle)
     app.router.add_post(WEBHOOK_PATH, webhook_handler)
 
-def main():
+async def main():
     bot = Bot(token=TELEGRAM_TOKEN)
     dp = Dispatcher()
     
@@ -195,26 +194,32 @@ def main():
     dp.message.register(cmd_start, Command(commands=["start"]))
     dp.callback_query.register(geo_button, F.data == "geo")
     dp.message.register(download_handler, Command("download"))
-    logger.info("Регистрируем обработчик для текстовых сообщений")
     dp.message.register(messages_handler, Command("messages"))
-    dp.message.register(message_handler, F.text & ~F.text.startswith("/"))
+    dp.message.register(
+        message_handler,  # Use the wrapper function instead of lambda
+        lambda message: message.text and not message.text.startswith('/')
+    )
 
     dp.message.register(change_handler, Command("change"))
     dp.message.register(add_handler, Command("add"))
     dp.message.register(delete_handler, Command("delete"))
 
     dp.callback_query.register(download_all_callback, lambda c: c.data == "download_all")
-# Create aiohttp app
     app = web.Application()
     setup_routes(app, dp, bot)
-
-    # Startup/shutdown hooks
     app.on_startup.append(lambda _: on_startup(bot))
     app.on_shutdown.append(lambda _: on_shutdown(bot))
 
-    port = int(os.environ.get("PORT", 8000))
-    logger.info(f"Starting bot on port {port}")
-    web.run_app(app, port=port)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", int(os.environ.get("PORT", 8000)))
+    await site.start()
+    logger.info("Bot is running...")
+
+    # держим цикл живым
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())

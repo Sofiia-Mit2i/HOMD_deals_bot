@@ -2,7 +2,7 @@ import logging
 import pandas as pd
 from aiogram import types
 from aiogram.filters import Command
-from aiogram.types import BufferedInputFile
+
 from getexcel import send_team_excel
 from admin import is_admin
 from io import BytesIO
