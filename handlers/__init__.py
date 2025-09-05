@@ -9,7 +9,7 @@ async def cmd_start(message: types.Message):
             [InlineKeyboardButton(text="Type GEOs Now", callback_data="geo")]
         ]
     )
-    await message.answer("Hi there! Welcome to HOMD   We’ve got 7 powerhouse teams with top-tier SEO & PPC traffic. Type your GEOs (e.g., UK, DE, PL) and we’ll hook you up with the right managers in seconds", reply_markup=keyboard)
+    await message.answer("👋Hi there! Welcome to HOMD🚀 We’ve got 7 powerhouse teams with top-tier SEO , PPC, and ASO traffic.Type your GEOs (e.g., UK, DE, PL) and we’ll hook you up with the right managers in seconds⚡️", reply_markup=keyboard)
 
 async def geo_button(callback_query: types.CallbackQuery):
     await callback_query.answer()
@@ -83,9 +83,10 @@ async def handle_geos(message: types.Message, supabase, COUNTRY_MAP):
     reply_text = "\n".join(reply_parts)
     if correct_geos:
         footer = "\n\n✅ Next steps\n" \
-                " • Please message each contact separately (so nothing gets missed).\n" \
-                " • They'll help with the best deals for your GEOs as soon as possible.\n" \
-                " • If anything looks off or a link doesn't work, ping @racketwoman.\n" \
+                " • IMPORTANT: DM each contact separately — every team has different offers and traffic from their own sites.\n" \
+                " Here is the message.  Hey there 👋 I’m [Your Name] from [Brand]. Our affiliate program: [URL]. We’re ready to talk GEOs and deal terms—when’s a good time for you?" \
+                " • They’ll help you with the best deals for your GEOs ASAP.\n" 
+                " • If anything looks off or a link doesn’t work, ping @racketwoman\n" \
                 "Great to (e-)meet you—have a fantastic day! 🙌"
         reply_text += footer
 
