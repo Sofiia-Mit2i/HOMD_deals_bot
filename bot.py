@@ -16,6 +16,9 @@ from handlers.other import handle_other_message
 from adminpanel import change_contact, add_contact, delete_contact
 from admin import is_admin
 
+import aiohttp
+from aiohttp import web
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -193,8 +196,6 @@ if __name__ == "__main__":
     # Render требует, чтобы мы "слушали" порт
     port = int(os.environ.get("PORT", 8000))
     # создаём простой async сервер-затычку
-    import aiohttp
-    from aiohttp import web
 
     async def handle(request):
         return web.Response(text="Bot is running")
