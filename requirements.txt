@@ -1,4 +1,4 @@
-python-telegram-bot==21.6
+python-telegram-bot==20.3
 supabase==2.3.4
-httpx==0.27.0
+httpx==0.25.x
 rapidfuzz==3.9.0
