@@ -1,4 +1,5 @@
 import os
+import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -7,6 +8,13 @@ from telegram.ext import (
 from supabase import create_client, Client
 from rapidfuzz import process, fuzz
 from datetime import datetime
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -20,7 +28,13 @@ if not all([SUPABASE_URL, SUPABASE_KEY, TELEGRAM_TOKEN]):
 
 
 # подключение к Supabase
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+try:
+    # Initialize Supabase client with older syntax
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    logger.info("Successfully connected to Supabase")
+except Exception as e:
+    logger.error(f"Failed to connect to Supabase: {str(e)}")
+    raise
 
 COUNTRY_MAP = {
     "AU": ["AU", "AUSTRALIA", "АВСТРАЛИЯ", "АВСТРАЛІЯ"],
