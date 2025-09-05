@@ -12,7 +12,8 @@ from handlers.geo import handle_geos, normalize_geo
 from handlers import cmd_start, geo_button
 from handlers.excel import handle_download, handle_messages_download
 from handlers.other import handle_other_message
-from admin import is_admin
+
+from adminpanel import change_contact, add_contact, delete_contact
 
 # Configure logging
 logging.basicConfig(
@@ -100,6 +101,11 @@ async def main():
         message_handler,  # Use the wrapper function instead of lambda
         lambda message: message.text and not message.text.startswith('/')
     )
+
+    dp.message.register(lambda m: change_contact(m, supabase), Command("change"))
+    dp.message.register(lambda m: add_contact(m, supabase), Command("add"))
+    dp.message.register(lambda m: delete_contact(m, supabase), Command("delete"))
+
 
     # Start polling
     logger.info("🤖 Bot started...")
