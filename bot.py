@@ -2,6 +2,7 @@ import logging
 import os
 import asyncio
 from datetime import datetime
+from itertools import combinations
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -191,41 +192,44 @@ def normalize_geo(user_words):
 
     return correct, incorrect
 
-@dp.message(F.text)
+@dp.message(lambda message: message.text and not message.text.startswith('/'))
 async def handle_geos(message: types.Message):
-    if message.text.startswith("/"):
-        return  # игнорируем команды
-
     text = message.text.strip()
     user_words = text.replace(",", " ").split()
 
     correct_geos, incorrect_words = normalize_geo(user_words)
     await log_user_request(message.from_user.id, message.from_user.username, correct_geos)
 
-    results = {}
+    # 1. Словарь: GEO -> команды с контактами
+    geo_team_map = {}
     for geo in correct_geos:
         pg_array = "{" + geo + "}"
         response = supabase.table("geo").select("*").filter("geos", "cs", pg_array).execute()
-        results[geo] = []
+        geo_team_map[geo] = set()
         for row in response.data:
-            team_name = row["team_name"]
-            contacts = row["contact"]
-            contacts_str = ", ".join(contacts) if isinstance(contacts, list) else str(contacts)
-            results[geo].append(f"{team_name} – {contacts_str}")
+            team_contact = f"{row['team_name']} – {row['contact']}"
+            geo_team_map[geo].add(team_contact)
 
+    # 2. Найдем комбинации GEO, чтобы сгруппировать общие команды
+    used_teams = set()
     reply_parts = []
-    for geo, managers in results.items():
-        if managers:
-            reply_parts.append(f"{geo}:\n" + "\n".join(managers))
-        else:
-            reply_parts.append(f"❌ No managers found for {geo}")
+
+    # начинаем с наибольших комбинаций GEO, чтобы сначала показывать общих менеджеров
+    for r in range(len(correct_geos), 0, -1):
+        for geo_combo in combinations(correct_geos, r):
+            # пересечение команд для этой комбинации
+            combo_teams = set.intersection(*(geo_team_map[geo] for geo in geo_combo))
+            # оставляем только еще не использованных команд
+            combo_teams -= used_teams
+            if combo_teams:
+                reply_parts.append(f"GEO: {', '.join(geo_combo)} – " + ", ".join(combo_teams))
+                used_teams.update(combo_teams)
+
+    # 3. Добавим некорректные GEO
     for word in incorrect_words:
         reply_parts.append(f"❌ No managers found for {word}")
 
-    reply_text = "\n\n".join(reply_parts)
-    if correct_geos:
-        reply_text += "\n\n✅ Next steps\n • Please message each contact separately (so nothing gets missed).\n • They'll help with the best deals for your GEOs as soon as possible.\n • If anything looks off or a link doesn't work, ping @racketwoman.\nGreat to (e-)meet you—have a fantastic day!"
-
+    reply_text = "\n".join(reply_parts)
     await message.reply(reply_text)
 
     # ----------------------- Startup -----------------------
