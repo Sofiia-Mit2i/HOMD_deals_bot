@@ -9,8 +9,12 @@ from supabase import create_client, Client
 from rapidfuzz import process, fuzz
 from datetime import datetime
 
-# Загружаем переменные окружения
-load_dotenv()
+# только локально пытаемся подключить .env
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ModuleNotFoundError:
+    pass  # на Render это нормально
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
