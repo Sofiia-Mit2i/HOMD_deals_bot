@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -7,11 +9,12 @@ from supabase import create_client, Client
 from rapidfuzz import process, fuzz
 from datetime import datetime
 
-# 🔑 сюда вставь свои реальные данные
-SUPABASE_URL = "https://advxbolbcvhjxtgznwcj.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkdnhib2xiY3Zoanh0Z3pud2NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMjM2MjYsImV4cCI6MjA3MjU5OTYyNn0.jVmoIeQXFbpznCToLbjus1laqTIGoGOM3DScGxfwCHA"
-TELEGRAM_TOKEN = "8353139978:AAF8BZ-ye2nMHfN_h6pkvJ70rA2kK-UeJ5M"
+# Загружаем переменные окружения
+load_dotenv()
 
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 # подключение к Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
