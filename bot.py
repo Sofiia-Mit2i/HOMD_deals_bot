@@ -1,14 +1,16 @@
-import os
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application, CommandHandler, MessageHandler,
-    CallbackQueryHandler, ContextTypes, filters
-)
-from supabase import create_client, Client
-from rapidfuzz import process, fuzz
+import os
+import asyncio
 from datetime import datetime
 
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.filters import Command
+from aiogram import F
+
+from supabase import create_client
+from rapidfuzz import process, fuzz
+from dotenv import load_dotenv
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -16,25 +18,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from dotenv import load_dotenv
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-
-if not all([SUPABASE_URL, SUPABASE_KEY, TELEGRAM_TOKEN]):
-    raise ValueError("Missing required environment variables. Please check SUPABASE_URL, SUPABASE_KEY, and TELEGRAM_TOKEN are set.")
+bot = Bot(token=TELEGRAM_TOKEN)
+dp = Dispatcher()
 
 
 # подключение к Supabase
 try:
-    # Initialize Supabase client with older syntax
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    supabase = create_client(
+        supabase_url=SUPABASE_URL,
+        supabase_key=SUPABASE_KEY
+    )
     logger.info("Successfully connected to Supabase")
 except Exception as e:
     logger.error(f"Failed to connect to Supabase: {str(e)}")
-    raise
+    raise SystemExit(1)
 
 COUNTRY_MAP = {
     "AU": ["AU", "AUSTRALIA", "АВСТРАЛИЯ", "АВСТРАЛІЯ"],
@@ -137,29 +139,27 @@ COUNTRY_MAP = {
 
 # -----------------------
 # /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("Type GEOs Now", callback_data="geo")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("👋 Welcome! Please type your GEOs:", reply_markup=reply_markup)
-
+@dp.message(Command(commands=["start"]))
+async def cmd_start(message: types.Message):
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Type GEOs Now", callback_data="geo")]
+        ]
+    )
+    await message.answer("👋 Welcome! Please type your GEOs:", reply_markup=keyboard)
 # -----------------------
 # inline кнопка → вызывает /geo
-async def geo_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.message.reply_text("✍️ Please enter GEOs (e.g. AU, US, IT):")
+@dp.callback_query(F.data == "geo")
+async def geo_button(callback_query: types.CallbackQuery):
+    await callback_query.answer()
+    await callback_query.message.answer("✍️ Please enter GEOs (e.g. AU, US, IT):")
 
 async def log_user_request(user_id, username, geo_list):
-    """
-    geo_list = ['AU', 'US', 'PL'] – список ISO кодов, которые запросил пользователь
-    """
     now = datetime.utcnow().isoformat()
-
     for geo in geo_list:
-        # Определяем команды, которые отвечают за GEO
         response = supabase.table("geo").select("*").filter("geos", "cs", f'{{{geo}}}').execute()
         for row in response.data:
-            team_table = f"{row['team_name'].lower()}_requests"  # имя таблицы команды
+            team_table = f"{row['team_name'].lower()}_requests"
             supabase.table(team_table).insert({
                 "user_id": user_id,
                 "username": username,
@@ -170,21 +170,13 @@ async def log_user_request(user_id, username, geo_list):
 # -----------------------
 # обработка сообщений с GEO
 def normalize_geo(user_words):
-    """
-    Принимает список слов пользователя.
-    Возвращает:
-        - корректные ISO GEO-коды (список)
-        - некорректные слова (список)
-    """
     correct = []
     incorrect = []
 
-    # Нормализуем COUNTRY_MAP для поиска (все значения в верхнем регистре
-
     for word in user_words:
-        word_clean = word.strip().replace("ё", "е").upper() # очистка ввода
+        word_clean = word.strip().replace("ё", "е").upper()
         best_match = None
-        best_score = 70  # уменьшенный порог для частичных совпадений
+        best_score = 70
 
         for geo_code, names in COUNTRY_MAP.items():
             score = process.extractOne(word_clean, names, scorer=fuzz.ratio)
@@ -199,74 +191,60 @@ def normalize_geo(user_words):
 
     return correct, incorrect
 
-async def handle_geos(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    # Разделяем по пробелам и запятым
+@dp.message(F.text)
+async def handle_geos(message: types.Message):
+    if message.text.startswith("/"):
+        return  # игнорируем команды
+
+    text = message.text.strip()
     user_words = text.replace(",", " ").split()
 
-    # Нормализуем введённые страны
     correct_geos, incorrect_words = normalize_geo(user_words)
-
-    await log_user_request(update.message.from_user.id, update.message.from_user.username, correct_geos)
-
-    print("DEBUG: Correct GEOs:", correct_geos)
-    print("DEBUG: Incorrect words:", incorrect_words)
+    await log_user_request(message.from_user.id, message.from_user.username, correct_geos)
 
     results = {}
+    for geo in correct_geos:
+        pg_array = "{" + geo + "}"
+        response = supabase.table("geo").select("*").filter("geos", "cs", pg_array).execute()
+        results[geo] = []
+        for row in response.data:
+            team_name = row["team_name"]
+            contacts = row["contact"]
+            contacts_str = ", ".join(contacts) if isinstance(contacts, list) else str(contacts)
+            results[geo].append(f"{team_name} – {contacts_str}")
 
-    if correct_geos:
-        # формируем массив для Postgres text[]
-        pg_array = "{" + ",".join(correct_geos) + "}"
-        response = supabase.table("geo").select("*").filter("geos", "ov", pg_array).execute()
-
-        for geo in correct_geos:
-    # массив с одним элементом, чтобы использовать фильтр Postgres 'cs' (contains)
-            pg_array = "{" + geo + "}"
-            response = supabase.table("geo").select("*").filter("geos", "cs", pg_array).execute()
-
-            results[geo] = []
-            for row in response.data:
-                team_name = row["team_name"]
-                contacts = row["contact"]
-                contacts_str = ", ".join(contacts) if isinstance(contacts, list) else str(contacts)
-                results[geo].append(f"{team_name} – {contacts_str}")
-
-    
-    # Формируем сообщение с контактами
     reply_parts = []
-
     for geo, managers in results.items():
         if managers:
             reply_parts.append(f"{geo}:\n" + "\n".join(managers))
         else:
             reply_parts.append(f"❌ No managers found for {geo}")
-
     for word in incorrect_words:
         reply_parts.append(f"❌ No managers found for {word}")
 
-    # Объединяем в один текст
     reply_text = "\n\n".join(reply_parts)
-
-    # Добавляем сообщение с инструкциями
     if correct_geos:
-        reply_text += "\n\n✅ Next steps\n" \
-                    " • Please message each contact separately (so nothing gets missed).\n" \
-                    " • They’ll help with the best deals for your GEOs as soon as possible.\n" \
-                    " • If anything looks off or a link doesn’t work, ping @racketwoman.\n" \
-                    "Great to (e-)meet you—have a fantastic day!"
+        reply_text += "\n\n✅ Next steps\n • Please message each contact separately (so nothing gets missed).\n • They'll help with the best deals for your GEOs as soon as possible.\n • If anything looks off or a link doesn't work, ping @racketwoman.\nGreat to (e-)meet you—have a fantastic day!"
 
-    await update.message.reply_text(reply_text)
+    await message.reply(reply_text)
 
-# -----------------------
-def main():
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    # ----------------------- Startup -----------------------
+# Replace the main() function at the bottom of the file with:
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(geo_button, pattern="^geo$"))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_geos))
-
-    print("🤖 Bot started...")
-    app.run_polling()
+async def main():
+    # Initialize Bot instance with a default parse mode
+    bot = Bot(token=TELEGRAM_TOKEN)
+    dp = Dispatcher()
+    
+    # Register all handlers
+    dp.message.register(cmd_start, Command(commands=["start"]))
+    dp.callback_query.register(geo_button, F.data == "geo")
+    dp.message.register(handle_geos, F.text)
+    
+    # Start polling
+    logger.info("🤖 Bot started...")
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    main()
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(main())
