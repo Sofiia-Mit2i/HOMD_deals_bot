@@ -160,13 +160,22 @@ async def delete_handler(message: types.Message):
 async def download_all_wrapper(callback: types.CallbackQuery):
     await download_all_callback(callback, supabase)
 
+async def start_web_app():
+    async def handle(request):
+        return web.Response(text="Bot is running")
+    app = web.Application()
+    app.router.add_get("/", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, port=int(os.environ.get("PORT", 8000)))
+    await site.start()
+    logger.info(f"Web server started on port {os.environ.get('PORT', 8000)}")
+
 async def main():
     # Initialize Bot instance
     TOKEN = os.getenv("TELEGRAM_TOKEN")
     bot = Bot(token=TOKEN)
     dp = Dispatcher()
-
-    await dp.start_polling(bot)
     
     # Register all handlers
     dp.message.register(cmd_start, Command(commands=["start"]))
@@ -186,6 +195,7 @@ async def main():
     download_all_wrapper,
     lambda c: c.data == "download_all"
 )
+    asyncio.create_task(start_web_app())
 
     
     # Start polling
@@ -193,16 +203,7 @@ async def main():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    # Render требует, чтобы мы "слушали" порт
-    port = int(os.environ.get("PORT", 8000))
-    # создаём простой async сервер-затычку
-
-    async def handle(request):
-        return web.Response(text="Bot is running")
-
-    app = web.Application()
-    app.router.add_get("/", handle)
-
-    loop = asyncio.get_event_loop()
-    loop.create_task(web._run_app(app, port=port))
-    loop.run_until_complete(main())
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Bot stopped")
