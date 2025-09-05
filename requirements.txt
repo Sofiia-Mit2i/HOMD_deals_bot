@@ -1,5 +1,5 @@
 python-telegram-bot==20.3
 python-dotenv==1.0.0
-supabase-py==0.0.2
-httpx==0.24.1
+supabase==2.3.3
+httpx~=0.24.0
 rapidfuzz==3.9.0
