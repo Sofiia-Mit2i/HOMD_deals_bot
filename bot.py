@@ -16,7 +16,6 @@ from handlers.other import handle_other_message
 from adminpanel import change_contact, add_contact, delete_contact
 from admin import is_admin
 
-import aiohttp
 from aiohttp import web
 
 # Configure logging
@@ -41,17 +40,17 @@ except Exception as e:
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+WEBHOOK_HOST = os.getenv("https://homd-deals-bot-jsx7.onrender.com")  # твой Render-домен, например: https://mybot.onrender.com
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
-if not all([SUPABASE_URL, SUPABASE_KEY, TELEGRAM_TOKEN]):
+if not all([SUPABASE_URL, SUPABASE_KEY, TELEGRAM_TOKEN, WEBHOOK_HOST]):
     logger.error("Missing required environment variables")
     raise SystemExit(1)
 
 # Initialize Supabase
 try:
-    supabase = create_client(
-        supabase_url=SUPABASE_URL,
-        supabase_key=SUPABASE_KEY
-    )
+    supabase = create_client(supabase_url=SUPABASE_URL, supabase_key=SUPABASE_KEY)
     logger.info("Successfully connected to Supabase")
 except Exception as e:
     logger.error(f"Failed to connect to Supabase: {str(e)}")
