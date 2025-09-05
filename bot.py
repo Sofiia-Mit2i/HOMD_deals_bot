@@ -85,7 +85,17 @@ async def messages_handler(message: types.Message):
     """Wrapper function for handle_messages_download to properly pass supabase"""
     await handle_messages_download(message, supabase)
 
+async def change_handler(message: types.Message):
+    """Wrapper function for change_contact command"""
+    await change_contact(message, supabase)
 
+async def add_handler(message: types.Message):
+    """Wrapper function for add_contact command"""
+    await add_contact(message, supabase)
+
+async def delete_handler(message: types.Message):
+    """Wrapper function for delete_contact command"""
+    await delete_contact(message, supabase)
 
 async def main():
     # Initialize Bot instance
@@ -102,11 +112,10 @@ async def main():
         lambda message: message.text and not message.text.startswith('/')
     )
 
-    dp.message.register(lambda m: change_contact(m, supabase), Command("change"))
-    dp.message.register(lambda m: add_contact(m, supabase), Command("add"))
-    dp.message.register(lambda m: delete_contact(m, supabase), Command("delete"))
-
-
+    dp.message.register(change_handler, Command("change"))
+    dp.message.register(add_handler, Command("add"))
+    dp.message.register(delete_handler, Command("delete"))
+    
     # Start polling
     logger.info("🤖 Bot started...")
     await dp.start_polling(bot)
