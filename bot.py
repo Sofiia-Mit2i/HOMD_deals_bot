@@ -186,7 +186,7 @@ def setup_routes(app: web.Application, dp: Dispatcher, bot: Bot):
     app.router.add_get("/", handle)
     app.router.add_post(WEBHOOK_PATH, webhook_handler)
 
-async def main():
+def main():
     bot = Bot(token=TELEGRAM_TOKEN)
     dp = Dispatcher()
     
