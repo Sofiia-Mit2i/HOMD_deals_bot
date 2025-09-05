@@ -38,6 +38,9 @@ def normalize_geo(user_words, COUNTRY_MAP):
         best_match = None
         best_score = 70
 
+        if len(word_clean) < 2 or any(char.isdigit() for char in word_clean):
+            continue
+
         for geo_code, names in COUNTRY_MAP.items():
             score = process.extractOne(word_clean, names, scorer=fuzz.ratio)
             if score and score[1] >= best_score:

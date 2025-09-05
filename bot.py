@@ -8,9 +8,10 @@ from aiogram import F
 from supabase import create_client
 from dotenv import load_dotenv
 
-from handlers.geo import handle_geos
+from handlers.geo import handle_geos, normalize_geo
 from handlers import cmd_start, geo_button
 from handlers.excel import handle_download
+from handlers.other import handle_other_message
 
 # Configure logging
 logging.basicConfig(
@@ -51,12 +52,33 @@ except Exception as e:
     raise SystemExit(1)
 
 async def message_handler(message: types.Message):
-    """Wrapper function for handle_geos to properly await it"""
-    await handle_geos(message, supabase, COUNTRY_MAP)
+    """Route messages to appropriate handlers"""
+    try:
+        text = message.text.strip()
+        words = text.replace(",", " ").split()
+        
+        # Try to normalize as GEOs first
+        correct_geos, incorrect_words = normalize_geo(words, COUNTRY_MAP)
+        
+        # Route to appropriate handler:
+        # 1. If we have correct GEOs, handle as GEO message
+        # 2. If message is likely not a GEO attempt, handle as other message
+        if correct_geos:
+            await handle_geos(message, supabase, COUNTRY_MAP)
+        elif len(words) > 3 or not any(len(word) == 2 for word in words):
+            logger.info(f"Processing other message from user {message.from_user.id}")
+            await handle_other_message(message, supabase)
+        else:
+            # Treat as failed GEO attempt
+            await handle_geos(message, supabase, COUNTRY_MAP)
+    except Exception as e:
+        logger.error(f"Error in message_handler: {str(e)}")
+        await message.reply("An error occurred while processing your message.")
 
 async def download_handler(message: types.Message):
     """Wrapper function for handle_download to properly pass supabase"""
     await handle_download(message, supabase)
+
 
 async def main():
     # Initialize Bot instance
