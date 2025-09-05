@@ -9,16 +9,13 @@ from supabase import create_client, Client
 from rapidfuzz import process, fuzz
 from datetime import datetime
 
-# только локально пытаемся подключить .env
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ModuleNotFoundError:
-    pass  # на Render это нормально
-
+"""from dotenv import load_dotenv
+load_dotenv()
+"""
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+
 # подключение к Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
