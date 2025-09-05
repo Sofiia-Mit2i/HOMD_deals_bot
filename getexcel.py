@@ -2,80 +2,88 @@ from io import BytesIO
 import pandas as pd
 import logging
 from aiogram import types
-from aiogram.filters import Command
-from aiogram.types import FSInputFile, BufferedInputFile
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from admin import is_admin  # твоя проверка админов
 
 logger = logging.getLogger(__name__)
 
-async def get_team_by_user_id(supabase, user_id: int):
-    """
-    Returns team name for manager with given Telegram ID
-    """
-    try:
-        response = supabase.table("geo") \
-            .select("team_name") \
-            .contains("M_Id", [str(user_id)]) \
-            .execute()
-        
-        if response.data and len(response.data) > 0:
-            return response.data[0]["team_name"]
-        logger.info(f"No team found for user_id: {user_id}")
-        return None
-    except Exception as e:
-        logger.error(f"Error in get_team_by_user_id: {str(e)}")
-        return None
+# список всех команд (их имена совпадают с team_name в geo)
+TEAMS = ["Team1", "Team2", "Team3", "Team4", "Team5", "Team6", "Team7"]
 
 async def send_team_excel(message: types.Message, supabase):
     """
-    Sends Excel file with team data to the manager
+    Admin-only command to download request tables.
+    Usage:
+      /download Team1 Team2 ...
+      /download all
     """
     try:
         user_id = message.from_user.id
-        team_name = await get_team_by_user_id(supabase, user_id)
-        
-        logger.info(f"Processing download request for user {user_id}, team: {team_name}")
-
-        if not team_name:
-            await message.reply("❌ You are not authorized to download any data.")
+        if not await is_admin(user_id):
+            await message.reply("❌ У вас нет прав для этой команды.")
             return
 
-        # Get data from team-specific requests table
-        table_name = f"{team_name.lower()}_requests"
-        response = supabase.table(table_name)\
-            .select("*")\
-            .order("request_date", desc=True)\
-            .execute()
-        
-        if not response.data:
-            await message.reply("📊 No requests found for your team.")
+        parts = message.text.split()
+        if len(parts) == 1:
+            # Нет аргументов — показать справку и кнопку "all"
+            kb = InlineKeyboardBuilder()
+            kb.button(text="📥 Скачать все", callback_data="download_all")
+            await message.reply(
+                "⚠️ Использование команды:\n"
+                "`/download Team1 Team2 ...`\n"
+                "или `/download all` чтобы скачать все таблицы.",
+                parse_mode="Markdown",
+                reply_markup=kb.as_markup()
+            )
             return
 
-        # Create Excel in memory
-        df = pd.DataFrame(response.data)
-        
-        # Convert all columns to string to prevent type errors
-        for column in df.columns:
-            df[column] = df[column].astype(str)
+        targets = parts[1:]
+        tables = []
 
-        # Save to BytesIO
-        buffer = BytesIO()
-        df.to_excel(buffer, index=False, engine='openpyxl')
-        buffer.seek(0)
-        
-        # Convert BytesIO to BufferedInputFile
-        excel_file = BufferedInputFile(
-            buffer.getvalue(),
-            filename=f"{team_name}_requests.xlsx"
-        )
+        if "all" in [t.lower() for t in targets]:
+            tables = [f"{team.lower()}_requests" for team in TEAMS]
+        else:
+            tables = [f"{team.lower()}_requests" for team in targets if team in TEAMS]
 
-        # Send file through Telegram
-        await message.reply_document(
-            document=excel_file,
-            caption=f"📊 Request data for team {team_name}"
-        )
-        logger.info(f"Successfully sent Excel file for team {team_name}")
-        
+        if not tables:
+            await message.reply("⚠️ Таблицы не найдены. Проверьте названия команд.")
+            return
+
+        for table_name in tables:
+            try:
+                response = supabase.table(table_name)\
+                    .select("*")\
+                    .order("request_date", desc=True)\
+                    .execute()
+                
+                if not response.data:
+                    await message.reply(f"📊 В таблице {table_name} нет данных.")
+                    continue
+
+                # DataFrame → Excel
+                df = pd.DataFrame(response.data)
+                for col in df.columns:
+                    df[col] = df[col].astype(str)
+
+                buffer = BytesIO()
+                df.to_excel(buffer, index=False, engine="openpyxl")
+                buffer.seek(0)
+
+                file = types.BufferedInputFile(
+                    buffer.getvalue(),
+                    filename=f"{table_name}.xlsx"
+                )
+
+                await message.reply_document(
+                    document=file,
+                    caption=f"📊 Данные из {table_name}"
+                )
+                logger.info(f"✅ Sent {table_name} to admin {user_id}")
+
+            except Exception as table_err:
+                logger.error(f"Error exporting {table_name}: {str(table_err)}")
+                await message.reply(f"❌ Ошибка при экспорте {table_name}")
+
     except Exception as e:
-        error_msg = f"Error generating Excel for user {message.from_user.id}: {str(e)}"
-        logger.error(error_msg)
-        await message.reply("❌ Error generating report. Please try again later.")
+        logger.error(f"Error in send_team_excel: {str(e)}")
+        await message.reply("❌ Ошибка при генерации отчета.")

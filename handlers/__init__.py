@@ -9,7 +9,7 @@ async def cmd_start(message: types.Message):
             [InlineKeyboardButton(text="Type GEOs Now", callback_data="geo")]
         ]
     )
-    await message.answer("👋 Welcome! Please type your GEOs:", reply_markup=keyboard)
+    await message.answer("Hi there! Welcome to HOMD   We’ve got 7 powerhouse teams with top-tier SEO & PPC traffic. Type your GEOs (e.g., UK, DE, PL) and we’ll hook you up with the right managers in seconds", reply_markup=keyboard)
 
 async def geo_button(callback_query: types.CallbackQuery):
     await callback_query.answer()

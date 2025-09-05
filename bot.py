@@ -14,6 +14,8 @@ from handlers.excel import handle_download, handle_messages_download
 from handlers.other import handle_other_message
 
 from adminpanel import change_contact, add_contact, delete_contact
+from getexcel import send_team_excel  # импорт твоей функции
+from admin import is_admin
 
 # Configure logging
 logging.basicConfig(
@@ -52,6 +54,62 @@ try:
 except Exception as e:
     logger.error(f"Failed to connect to Supabase: {str(e)}")
     raise SystemExit(1)
+
+# Callback для кнопки "Скачать все"
+async def download_all_callback(callback: types.CallbackQuery, supabase):
+    user_id = callback.from_user.id
+    if not await is_admin(user_id):
+        await callback.answer("❌ У вас нет прав для этой команды.", show_alert=True)
+        return
+
+    # Передаём текст напрямую и бот
+    await send_team_excel_from_callback(callback, supabase)
+
+    await callback.answer()  # убрать "часики"
+
+# новая версия send_team_excel для callback
+async def send_team_excel_from_callback(callback: types.CallbackQuery, supabase):
+    """
+    Скачивание всех таблиц по кнопке "Скачать все"
+    """
+    TEAMS = ["Team1", "Team2", "Team3", "Team4", "Team5", "Team6", "Team7"]
+    user_id = callback.from_user.id
+
+    tables = [f"{team.lower()}_requests" for team in TEAMS]
+
+    for table_name in tables:
+        try:
+            response = supabase.table(table_name)\
+                .select("*")\
+                .order("request_date", desc=True)\
+                .execute()
+
+            if not response.data:
+                await callback.message.answer(f"📊 В таблице {table_name} нет данных.")
+                continue
+
+            # DataFrame → Excel
+            import pandas as pd
+            from io import BytesIO
+            df = pd.DataFrame(response.data)
+            for col in df.columns:
+                df[col] = df[col].astype(str)
+
+            buffer = BytesIO()
+            df.to_excel(buffer, index=False, engine="openpyxl")
+            buffer.seek(0)
+
+            from aiogram.types import BufferedInputFile
+            file = BufferedInputFile(buffer.getvalue(), filename=f"{table_name}.xlsx")
+
+            await callback.message.answer_document(
+                document=file,
+                caption=f"📊 Данные из {table_name}"
+            )
+        except Exception as e:
+            logging.error(f"Ошибка при экспорте {table_name}: {e}")
+            await callback.message.answer(f"❌ Ошибка при экспорте {table_name}")
+
 
 async def message_handler(message: types.Message):
     """Route messages to appropriate handlers"""
@@ -97,6 +155,9 @@ async def delete_handler(message: types.Message):
     """Wrapper function for delete_contact command"""
     await delete_contact(message, supabase)
 
+async def download_all_wrapper(callback: types.CallbackQuery):
+    await download_all_callback(callback, supabase)
+
 async def main():
     # Initialize Bot instance
     bot = Bot(token=TELEGRAM_TOKEN)
@@ -115,6 +176,12 @@ async def main():
     dp.message.register(change_handler, Command("change"))
     dp.message.register(add_handler, Command("add"))
     dp.message.register(delete_handler, Command("delete"))
+
+    dp.callback_query.register(
+    download_all_wrapper,
+    lambda c: c.data == "download_all"
+)
+
     
     # Start polling
     logger.info("🤖 Bot started...")
