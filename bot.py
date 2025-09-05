@@ -159,8 +159,11 @@ async def download_all_wrapper(callback: types.CallbackQuery):
 
 async def main():
     # Initialize Bot instance
-    bot = Bot(token=TELEGRAM_TOKEN)
+    TOKEN = os.getenv("TELEGRAM_TOKEN")
+    bot = Bot(token=TOKEN)
     dp = Dispatcher()
+
+    await dp.start_polling(bot)
     
     # Register all handlers
     dp.message.register(cmd_start, Command(commands=["start"]))
@@ -187,4 +190,18 @@ async def main():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Render требует, чтобы мы "слушали" порт
+    port = int(os.environ.get("PORT", 8000))
+    # создаём простой async сервер-затычку
+    import aiohttp
+    from aiohttp import web
+
+    async def handle(request):
+        return web.Response(text="Bot is running")
+
+    app = web.Application()
+    app.router.add_get("/", handle)
+
+    loop = asyncio.get_event_loop()
+    loop.create_task(web._run_app(app, port=port))
+    loop.run_until_complete(main())
