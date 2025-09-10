@@ -17,27 +17,38 @@ async def log_user_request(supabase, user_id, username, geo_list):
             return
 
         # Получаем все команды, которые соответствуют хотя бы одному GEO
-        team_geo_map = {}  # team_name -> list of GEOs
+         team_map = {}  # team_name -> list of GEOs
         for geo in geo_list:
-            response = supabase.table("geo").select("*").filter("geos", "cs", f'{{{geo}}}').execute()
+            pg_array = "{" + geo + "}"  # для фильтрации в Supabase
+            response = supabase.table("geo").select("*").filter("geos", "cs", pg_array).execute()
             for row in response.data:
-                team = row['team_name'].lower()
-                if team not in team_geo_map:
-                    team_geo_map[team] = set()
-                team_geo_map[team].add(geo)
+                team_name = row['team_name'].lower()
+                if team_name not in team_map:
+                    team_map[team_name] = []
+                team_map[team_name].append(geo)
 
-        # Записываем в Supabase по каждой команде, все GEO одной строкой
-        for team, geos in team_geo_map.items():
-            supabase.table(f"{team}_requests").insert({
+        # Вставляем по каждой команде одну строку с объединёнными GEO
+        for team_name, geos in team_map.items():
+            team_table = f"{team_name}_requests"
+            geo_text = " ".join(geos)  # объединяем GEO в одну строку
+            supabase.table(team_table).insert({
                 "user_id": user_id,
                 "username": username,
-                "geo": " ".join(sorted(geos)),  # комбинируем GEO в одну строку
+                "geo": geo_text,
                 "request_date": now
             }).execute()
 
-        logger.info(f"Logged request for user {username} with GEOs: {geo_list}")
+        # Если нужно, можно добавить общую запись в team8_requests с полным списком GEO
+        supabase.table("team8_requests").insert({
+            "user_id": user_id,
+            "username": username,
+            "geo": " ".join(geo_list),
+            "request_date": now
+        }).execute()
+
     except Exception as e:
-        logger.error(f"Failed to log request: {str(e)}")
+        import logging
+        logging.error(f"Failed to log request: {str(e)}")
 
 def normalize_geo(user_words, COUNTRY_MAP):
     """
