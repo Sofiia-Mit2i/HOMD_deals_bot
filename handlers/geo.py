@@ -17,7 +17,7 @@ async def log_user_request(supabase, user_id, username, geo_list):
             return
 
         # Получаем все команды, которые соответствуют хотя бы одному GEO
-         team_map = {}  # team_name -> list of GEOs
+        team_map = {}  # team_name -> list of GEOs
         for geo in geo_list:
             pg_array = "{" + geo + "}"  # для фильтрации в Supabase
             response = supabase.table("geo").select("*").filter("geos", "cs", pg_array).execute()
