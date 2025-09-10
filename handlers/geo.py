@@ -8,27 +8,33 @@ logger = logging.getLogger(__name__)
 
 async def log_user_request(supabase, user_id, username, geo_list):
     """
-    Log user GEO requests to team-specific tables in Supabase
+    Log user GEO requests to team-specific tables in Supabase.
+    Each team gets a single entry with all GEOs it is responsible for.
     """
     try:
         now = datetime.utcnow().isoformat()
+        if not geo_list:
+            return
+
+        # Получаем все команды, которые соответствуют хотя бы одному GEO
+        team_geo_map = {}  # team_name -> list of GEOs
         for geo in geo_list:
             response = supabase.table("geo").select("*").filter("geos", "cs", f'{{{geo}}}').execute()
             for row in response.data:
-                team_table = f"{row['team_name'].lower()}_requests"
-                supabase.table(team_table).insert({
-                    "user_id": user_id,
-                    "username": username,
-                    "geo": geo,
-                    "request_date": now
-                }).execute()
-        for geo in geo_list:
-            supabase.table("team8_requests").insert({
+                team = row['team_name'].lower()
+                if team not in team_geo_map:
+                    team_geo_map[team] = set()
+                team_geo_map[team].add(geo)
+
+        # Записываем в Supabase по каждой команде, все GEO одной строкой
+        for team, geos in team_geo_map.items():
+            supabase.table(f"{team}_requests").insert({
                 "user_id": user_id,
                 "username": username,
-                "geo": geo,
+                "geo": " ".join(sorted(geos)),  # комбинируем GEO в одну строку
                 "request_date": now
             }).execute()
+
         logger.info(f"Logged request for user {username} with GEOs: {geo_list}")
     except Exception as e:
         logger.error(f"Failed to log request: {str(e)}")
@@ -99,25 +105,41 @@ async def handle_geos(message: types.Message, supabase, COUNTRY_MAP):
             reply_parts.append(f"❌ No managers found for {word}")
 
         reply_text = "\n".join(reply_parts)
-        
-        # Add footer if there were any correct GEOs
+
+        # Footer
         if correct_geos:
             footer = (
-            "\n • IMPORTANT: DM each contact separately — every team has different offers and traffic from their own sites.\n"
-            " • They’ll help you with the best deals for your GEOs ASAP.\n"
-            " • If anything looks off or a link doesn’t work, ping @racketwoman\n"
-            " • Here is the message. Hey there 👋 I’m [Your Name] from [Brand]. "
-            "Our affiliate program: [URL]. We’re ready to talk GEOs and deal terms—when’s a good time for you?"
-        )
-        reply_text += footer
+                "\n • IMPORTANT: DM each contact separately — every team has different offers and traffic from their own sites.\n"
+                " • They’ll help you with the best deals for your GEOs ASAP.\n"
+                " • If anything looks off or a link doesn’t work, ping @racketwoman\n"
+                " • Here is the message. Hey there 👋 I’m [Your Name] from [Brand]. "
+                "Our affiliate program: [URL]. We’re ready to talk GEOs and deal terms—when’s a good time for you?"
+            )
+            reply_text += footer
 
         await message.reply(reply_text)
         logger.info(f"Processed GEOs for user {message.from_user.id}: correct={correct_geos}, incorrect={incorrect_words}")
-        
+
     except Exception as e:
         error_msg = f"Error processing GEOs: {str(e)}"
         logger.error(error_msg)
         await message.reply("❌ An error occurred while processing your request. Please try again later.")
 
-# Export the functions that will be used by other modules
-__all__ = ['handle_geos', 'normalize_geo', 'log_user_request']
+async def cmd_start(message: types.Message):
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Type GEOs Now", callback_data="geo")]
+        ]
+    )
+    await message.answer(
+        "👋Hi there! Welcome to HOMD🚀 We’ve got 7 powerhouse teams with top-tier SEO, PPC, and ASO traffic. "
+        "Type your GEOs (e.g., UK, DE, PL) and we’ll hook you up with the right managers in seconds⚡️",
+        reply_markup=keyboard
+    )
+
+async def geo_button(callback_query: types.CallbackQuery):
+    await callback_query.answer()
+    await callback_query.message.answer("✍️ Please enter GEOs (e.g. AU, US, IT):")
+
+__all__ = ['cmd_start', 'geo_button', 'handle_geos', 'normalize_geo', 'log_user_request']
