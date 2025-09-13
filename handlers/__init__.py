@@ -23,7 +23,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
     )
     await message.answer(
         "👋Hi there! Welcome to HOMD🚀 We’ve got 7 powerhouse teams with top-tier SEO, PPC, and ASO traffic.\n\n"
-        #"Type your Affiliate Website (URL):",
+        "Type your Affiliate Website (URL):"
         #reply_markup=keyboard
     )
 # --- Пользователь вводит сайт ---
