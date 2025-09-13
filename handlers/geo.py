@@ -1,16 +1,18 @@
+"""
 import logging
 from datetime import datetime
 from itertools import combinations
 from rapidfuzz import process, fuzz
 from aiogram import types
+from itertools import combinations
 
 logger = logging.getLogger(__name__)
 
 async def log_user_request(supabase, user_id, username, geo_list):
-    """
+    
     Log user GEO requests to team-specific tables in Supabase.
     Each team gets a single entry with all GEOs it is responsible for.
-    """
+    
     try:
         now = datetime.utcnow().isoformat()
         if not geo_list:
@@ -51,9 +53,9 @@ async def log_user_request(supabase, user_id, username, geo_list):
         logging.error(f"Failed to log request: {str(e)}")
 
 def normalize_geo(user_words, COUNTRY_MAP):
-    """
+    
     Match user input with country codes using fuzzy matching
-    """
+    
     correct = []
     incorrect = []
 
@@ -79,9 +81,9 @@ def normalize_geo(user_words, COUNTRY_MAP):
     return correct, incorrect
 
 async def handle_geos(message: types.Message, supabase, COUNTRY_MAP):
-    """
+    
     Handle incoming messages with GEO codes
-    """
+    
     try:
         text = message.text.strip()
         user_words = text.replace(",", " ").split()
@@ -123,8 +125,8 @@ async def handle_geos(message: types.Message, supabase, COUNTRY_MAP):
                 "\n • IMPORTANT: DM each contact separately — every team has different offers and traffic from their own sites.\n"
                 " • They’ll help you with the best deals for your GEOs ASAP.\n"
                 " • If anything looks off or a link doesn’t work, ping @racketwoman\n"
-                " • Here is the message. Hey there 👋 I’m [Your Name] from [Brand]. "
-                "Our affiliate program: [URL]. We’re ready to talk GEOs and deal terms—when’s a good time for you?"
+                f" • Here is the message. Hey there 👋 I’m {message.from_user.username or '[Your Name]'} from {brand}. "
+                f"Our affiliate program: {website}. We’re ready to talk GEOs and deal terms — when’s a good time for you?"
             )
             reply_text += footer
 
@@ -154,3 +156,5 @@ async def geo_button(callback_query: types.CallbackQuery):
     await callback_query.message.answer("✍️ Please enter GEOs (e.g. AU, US, IT):")
 
 __all__ = ['cmd_start', 'geo_button', 'handle_geos', 'normalize_geo', 'log_user_request']
+
+"""

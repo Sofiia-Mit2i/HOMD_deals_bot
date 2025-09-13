@@ -1,15 +1,54 @@
-from aiogram import types
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+import logging
 from datetime import datetime
 from itertools import combinations
+from rapidfuzz import process, fuzz
 
-async def cmd_start(message: types.Message):
+from aiogram import types
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+logger = logging.getLogger(__name__)
+
+# --- Определяем шаги сценария ---
+class StartFlow(StatesGroup):
+    waiting_for_website = State()
+    waiting_for_brand = State()
+    waiting_for_geo = State()
+
+async def cmd_start(message: types.Message, state: FSMContext):
+    await state.set_state(StartFlow.waiting_for_website)
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Type GEOs Now", callback_data="geo")]
-        ]
+        inline_keyboard=[[InlineKeyboardButton(text="Type your Affiliate Website", callback_data="website")]]
     )
-    await message.answer("👋Hi there! Welcome to HOMD🚀 We’ve got 7 powerhouse teams with top-tier SEO , PPC, and ASO traffic.Type your GEOs (e.g., UK, DE, PL) and we’ll hook you up with the right managers in seconds⚡️", reply_markup=keyboard)
+    await message.answer(
+        "👋Hi there! Welcome to HOMD🚀 We’ve got 7 powerhouse teams with top-tier SEO, PPC, and ASO traffic.\n\n"
+        "Type your Affiliate Website (URL):",
+        reply_markup=keyboard
+    )
+# --- Пользователь вводит сайт ---
+async def website_handler(message: types.Message, state: FSMContext):
+    await state.update_data(website=message.text.strip())
+    await state.set_state(StartFlow.waiting_for_brand)
+    await message.answer("👌 Got it!\n\nNow type your Brand name:")
+
+# --- Пользователь вводит бренд ---
+async def brand_handler(message: types.Message, state: FSMContext):
+    await state.update_data(brand=message.text.strip())
+    await state.set_state(StartFlow.waiting_for_geo)
+    await message.answer("👍 Great! Now type your GEOs (e.g. AU, US, IT):")
+
+# --- Пользователь вводит GEO ---
+async def geo_handler(message: types.Message, state: FSMContext, supabase, COUNTRY_MAP):
+    data = await state.get_data()
+    website = data.get("website", "[URL]")
+    brand = data.get("brand", "[Brand]")
+
+   # Запускаем geo-логику
+    await handle_geos(message, supabase, COUNTRY_MAP, website=website, brand=brand)
+
+    # После обработки очищаем state
+    await state.clear()
 
 async def geo_button(callback_query: types.CallbackQuery):
     await callback_query.answer()
@@ -50,50 +89,65 @@ def normalize_geo(user_words, COUNTRY_MAP):
 
     return correct, incorrect
 
-async def handle_geos(message: types.Message, supabase, COUNTRY_MAP):
-    text = message.text.strip()
-    user_words = text.replace(",", " ").split()
+async def handle_geos(message: types.Message, supabase, COUNTRY_MAP, website="[URL]", brand="[Brand]"):
+    try:
+        text = message.text.strip()
+        user_words = text.replace(",", " ").split()
 
-    correct_geos, incorrect_words = normalize_geo(user_words, COUNTRY_MAP)
-    await log_user_request(supabase, message.from_user.id, message.from_user.username, correct_geos)
+        correct_geos, incorrect_words = normalize_geo(user_words, COUNTRY_MAP)
+        await log_user_request(supabase, message.from_user.id, message.from_user.username, correct_geos)
 
-    geo_team_map = {}
-    for geo in correct_geos:
-        pg_array = "{" + geo + "}"
-        response = supabase.table("geo").select("*").filter("geos", "cs", pg_array).execute()
-        geo_team_map[geo] = set()
-        for row in response.data:
-            team_contact = f"{row['team_name']} – {row['contact']}"
-            geo_team_map[geo].add(team_contact)
+        geo_team_map = {}
+        for geo in correct_geos:
+            pg_array = "{" + geo + "}"
+            response = supabase.table("geo").select("*").filter("geos", "cs", pg_array).execute()
+            geo_team_map[geo] = set()
+            for row in response.data:
+                team_contact = f"{row['team_name']} – {row['contact']}"
+                geo_team_map[geo].add(team_contact)
 
-    used_teams = set()
-    reply_parts = []
+        used_teams = set()
+        reply_parts = []
 
-    for r in range(len(correct_geos), 0, -1):
-        for geo_combo in combinations(correct_geos, r):
-            combo_teams = set.intersection(*(geo_team_map[geo] for geo in geo_combo))
-            combo_teams -= used_teams
-            if combo_teams:
-                reply_parts.append(f"GEO: {', '.join(geo_combo)} – " + ", ".join(combo_teams))
-                used_teams.update(combo_teams)
+        for r in range(len(correct_geos), 0, -1):
+            for geo_combo in combinations(correct_geos, r):
+                combo_teams = set.intersection(*(geo_team_map[geo] for geo in geo_combo))
+                combo_teams -= used_teams
+                if combo_teams:
+                    reply_parts.append(f"GEO: {', '.join(geo_combo)} – " + ", ".join(combo_teams))
+                    used_teams.update(combo_teams)
 
-    for word in incorrect_words:
-        reply_parts.append(f"❌ No managers found for {word}")
+        for word in incorrect_words:
+            reply_parts.append(f"❌ No managers found for {word}")
 
-    reply_text = "\n".join(reply_parts)
+        reply_text = "\n".join(reply_parts)
 
-    if correct_geos:
-        footer = (
-            "\n • IMPORTANT: DM each contact separately — every team has different offers and traffic from their own sites.\n"
-            " • They’ll help you with the best deals for your GEOs ASAP.\n"
-            " • If anything looks off or a link doesn’t work, ping @racketwoman\n"
-            " • Here is the message. Hey there 👋 I’m [Your Name] from [Brand]. "
-            "Our affiliate program: [URL]. We’re ready to talk GEOs and deal terms—when’s a good time for you?"
-        )
-        reply_text += footer
+        if correct_geos:
+            footer = (
+                "\n • IMPORTANT: DM each contact separately — every team has different offers and traffic from their own sites.\n"
+                " • They’ll help you with the best deals for your GEOs ASAP.\n"
+                " • If anything looks off or a link doesn’t work, ping @racketwoman\n"
+                f" • Example message:\n"
+                f"Hey there 👋 I’m {message.from_user.username or '[Your Name]'} from {brand}. "
+                f"Our affiliate program: {website}. We’re ready to talk GEOs and deal terms — when’s a good time for you?"
+            )
+            reply_text += footer
 
-    await message.reply(reply_text)
+        await message.reply(reply_text)
+        logger.info(f"GEO processed for {message.from_user.id}: {correct_geos}")
 
+    except Exception as e:
+        logger.error(f"Error processing GEOs: {e}")
+        await message.reply("❌ An error occurred while processing your request. Please try again later.")
 
 # Export all handlers
-__all__ = ['cmd_start', 'geo_button', 'handle_geos', 'normalize_geo', 'log_user_request']
+__all__ = [
+    'cmd_start',
+    'website_handler',
+    'brand_handler',
+    'geo_handler',
+    'geo_button',
+    'handle_geos',
+    'normalize_geo',
+    'log_user_request'
+]

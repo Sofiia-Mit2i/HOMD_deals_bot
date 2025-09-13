@@ -8,10 +8,19 @@ from aiogram import F
 from supabase import create_client
 from dotenv import load_dotenv
 
-from handlers.geo import handle_geos, normalize_geo
-from handlers import cmd_start, geo_button
+from handlers import (
+    cmd_start,
+    website_handler,
+    brand_handler,
+    geo_handler,
+    geo_button,
+    handle_geos,
+    normalize_geo,
+    StartFlow
+)
 from handlers.excel import handle_download, handle_messages_download
 from handlers.other import handle_other_message
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from adminpanel import change_contact, add_contact, delete_contact
 from admin import is_admin
@@ -195,11 +204,16 @@ def setup_routes(app: web.Application, dp: Dispatcher, bot: Bot):
 
 async def main():
     bot = Bot(token=TELEGRAM_TOKEN)
-    dp = Dispatcher()
+    dp = Dispatcher(storage=MemoryStorage())
 
     # Регистрация всех обработчиков
-    dp.message.register(cmd_start, Command(commands=["start"]))
-    dp.callback_query.register(geo_button, F.data == "geo")
+    # FSM flow
+    dp.message.register(cmd_start, Command("start"))
+    dp.message.register(website_handler, StartFlow.waiting_for_website)
+    dp.message.register(brand_handler, StartFlow.waiting_for_brand)
+    dp.message.register(geo_handler, StartFlow.waiting_for_geo)
+
+    
     dp.message.register(download_handler, Command("download"))
     dp.message.register(messages_handler, Command("messages"))
     dp.message.register(message_handler, lambda message: message.text and not message.text.startswith('/'))
@@ -207,6 +221,7 @@ async def main():
     dp.message.register(add_handler, Command("add"))
     dp.message.register(delete_handler, Command("delete"))
     dp.callback_query.register(download_all_callback, lambda c: c.data == "download_all")
+    dp.callback_query.register(geo_button, F.data == "geo")
 
     app = web.Application()
     setup_routes(app, dp, bot)
