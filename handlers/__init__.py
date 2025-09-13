@@ -54,7 +54,7 @@ async def geo_button(callback_query: types.CallbackQuery):
     await callback_query.answer()
     await callback_query.message.answer("✍️ Please enter GEOs (e.g. AU, US, IT):")
 
-async def log_user_request(supabase, user_id, username, geo_list):
+async def log_user_request(supabase, user_id, username, geo_list, website="[URL]", brand="[Brand]"):
     now = datetime.utcnow().isoformat()
     for geo in geo_list:
         response = supabase.table("geo").select("*").filter("geos", "cs", f'{{{geo}}}').execute()
@@ -64,6 +64,8 @@ async def log_user_request(supabase, user_id, username, geo_list):
                 "user_id": user_id,
                 "username": username,
                 "geo": geo,
+                "site": website,
+                "brand": brand,
                 "request_date": now
             }).execute()
 
@@ -95,7 +97,14 @@ async def handle_geos(message: types.Message, supabase, COUNTRY_MAP, website="[U
         user_words = text.replace(",", " ").split()
 
         correct_geos, incorrect_words = normalize_geo(user_words, COUNTRY_MAP)
-        await log_user_request(supabase, message.from_user.id, message.from_user.username, correct_geos)
+        await log_user_request(
+            supabase,
+            message.from_user.id,
+            message.from_user.username,
+            correct_geos,
+            website=website,
+            brand=brand
+        )
 
         geo_team_map = {}
         for geo in correct_geos:
