@@ -16,7 +16,7 @@ from handlers import (
     website_handler,
     brand_handler,
     geo_handler,
-    geo_button,
+    #geo_button,
     handle_geos,
     normalize_geo,
     StartFlow
@@ -219,7 +219,7 @@ async def main():
     dp.message.register(add_handler, Command("add"))
     dp.message.register(delete_handler, Command("delete"))
     dp.callback_query.register(download_all_callback, lambda c: c.data == "download_all")
-    dp.callback_query.register(geo_button, F.data == "geo")
+    #dp.callback_query.register(geo_button, F.data == "geo")
 
     app = web.Application()
     setup_routes(app, dp, bot)

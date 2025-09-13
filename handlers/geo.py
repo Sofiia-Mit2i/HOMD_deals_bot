@@ -37,6 +37,8 @@ async def log_user_request(supabase, user_id, username, geo_list):
                 "user_id": user_id,
                 "username": username,
                 "geo": geo_text,
+                "site": website,
+                "brand": brand,
                 "request_date": now
             }).execute()
 
