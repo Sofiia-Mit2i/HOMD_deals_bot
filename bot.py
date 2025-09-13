@@ -7,6 +7,9 @@ from aiogram.filters import Command
 from aiogram import F
 from supabase import create_client
 from dotenv import load_dotenv
+from aiohttp import web
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.context import FSMContext
 
 from handlers import (
     cmd_start,
@@ -20,13 +23,8 @@ from handlers import (
 )
 from handlers.excel import handle_download, handle_messages_download
 from handlers.other import handle_other_message
-from aiogram.fsm.storage.memory import MemoryStorage
-
 from adminpanel import change_contact, add_contact, delete_contact
 from admin import is_admin
-
-import asyncio
-from aiohttp import web
 
 # Configure logging
 logging.basicConfig(
@@ -147,6 +145,9 @@ async def message_handler(message: types.Message):
         logger.error(f"Error in message_handler: {str(e)}")
         await message.reply("An error occurred while processing your message.")
 
+async def geo_handler_wrapper(message: types.Message, state: FSMContext):
+    await geo_handler(message, state, supabase, COUNTRY_MAP)
+
 async def download_handler(message: types.Message):
     """Wrapper function for handle_download to properly pass supabase"""
     await handle_download(message, supabase)
@@ -156,10 +157,7 @@ async def messages_handler(message: types.Message):
     await handle_messages_download(message, supabase)
 
 async def change_handler(message: types.Message):
-    
     logger.info(f"Received message: {message.text} from {message.from_user.id}")
-    
-
     """Wrapper function for change_contact command"""
     await change_contact(message, supabase)
 
@@ -202,6 +200,7 @@ def setup_routes(app: web.Application, dp: Dispatcher, bot: Bot):
     app.router.add_get("/", handle)
     app.router.add_post(WEBHOOK_PATH, webhook_handler)
 
+
 async def main():
     bot = Bot(token=TELEGRAM_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
@@ -211,8 +210,7 @@ async def main():
     dp.message.register(cmd_start, Command("start"))
     dp.message.register(website_handler, StartFlow.waiting_for_website)
     dp.message.register(brand_handler, StartFlow.waiting_for_brand)
-    dp.message.register(geo_handler, StartFlow.waiting_for_geo)
-
+    dp.message.register(geo_handler_wrapper, StartFlow.waiting_for_geo)
     
     dp.message.register(download_handler, Command("download"))
     dp.message.register(messages_handler, Command("messages"))
