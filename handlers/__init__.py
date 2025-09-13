@@ -70,24 +70,26 @@ async def log_user_request(supabase, user_id, username, geo_list, website="[URL]
                 if team_name not in team_map:
                     team_map[team_name] = []
                 team_map[team_name].append(geo)
-                for team_name, geos in team_map.items():
-                    team_table = f"{team_name}_requests"
-                    geo_text = " ".join(geos)  # объединяем GEO в одну строку
-                    supabase.table(team_table).insert({
-                        "user_id": user_id,
-                        "username": username,
-                        "geo": geo_text,
-                        "site": website,
-                        "brand": brand,
-                        "request_date": now
-                    }).execute()
-
-                supabase.table("team8_requests").insert({
+        for team_name, geos in team_map.items():
+            team_table = f"{team_name}_requests"
+            geo_text = " ".join(geos)  # объединяем GEO в одну строку
+            supabase.table(team_table).insert({
                 "user_id": user_id,
                 "username": username,
-                "geo": " ".join(geo_list),
+                "geo": geo_text,
+                "site": website,
+                "brand": brand,
                 "request_date": now
             }).execute()
+
+        supabase.table("team8_requests").insert({
+            "user_id": user_id,
+            "username": username,
+            "geo": " ".join(geo_list),
+            "site": website,
+            "brand": brand,
+            "request_date": now
+        }).execute()
             
     except Exception as e:
         logging.error(f"Failed to log request: {str(e)}")
