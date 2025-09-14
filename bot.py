@@ -236,6 +236,12 @@ def setup_routes(app: web.Application, dp: Dispatcher, bot: Bot):
     app.router.add_get("/", handle)
     app.router.add_post(WEBHOOK_PATH, webhook_handler)
 
+async def start_new_request_callback(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(StartFlow.waiting_for_website)
+    await callback.message.answer("🌐 Please type your Affiliate Website to begin a new request:")
+    await callback.answer()
+
+
 
 async def main():
     bot = Bot(token=TELEGRAM_TOKEN)
@@ -255,6 +261,8 @@ async def main():
     dp.message.register(add_handler, Command("add"))
     dp.message.register(delete_handler, Command("delete"))
     dp.callback_query.register(download_all_callback, lambda c: c.data == "download_all")
+    dp.callback_query.register(start_new_request_callback, lambda c: c.data == "start_new_request")
+
     #dp.callback_query.register(geo_button, F.data == "geo")
 
     app = web.Application()
