@@ -186,8 +186,11 @@ async def handle_geos(message: types.Message, supabase, COUNTRY_MAP, website="[U
                 "Great to (e-)meet you — have a fantastic day! 🙌"
             )
 
-            # 4 сообщение – контакты по GEO
-            await message.reply("\n".join(reply_parts))
+            # 4 сообщение – контакты по GEO + сразу кнопка
+            await message.reply(
+                "\n".join(reply_parts),
+                reply_markup=get_start_new_request_keyboard()
+            )
 
         logger.info(f"GEO processed for {message.from_user.id}: {correct_geos}")
 
