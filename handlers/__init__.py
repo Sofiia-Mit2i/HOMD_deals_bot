@@ -158,22 +158,34 @@ async def handle_geos(message: types.Message, supabase, COUNTRY_MAP, website="[U
         reply_text = "\n".join(reply_parts)
 
         if correct_geos:
-            footer = (
-                "\n • IMPORTANT: DM each contact separately — every team has different offers and traffic from their own sites.\n"
-                " • They’ll help you with the best deals for your GEOs ASAP.\n"
-                " • If anything looks off or a link doesn’t work, ping @racketwoman\n"
-                f" • Example message:\n"
-                f"Hey there 👋 I’m {message.from_user.username or '[Your Name]'} from {brand}. "
-                f"Our affiliate program: {website}. We’re ready to talk GEOs and deal terms — when’s a good time for you?"
+            # 1 сообщение
+            await message.reply(
+                "📌 Copy and paste this message below to !EACH! of the contacts that you will see in blue! "
+                "Every team has different offers and traffic from their own sites."
             )
-            reply_text += footer
 
-        await message.reply(reply_text)
+            # 2 сообщение
+            await message.reply(
+                f"Hi! I’m {message.from_user.username or '[Your Name]'} from {brand}.\n"
+                f"Affiliate program: {website}\n"
+                f"We’re looking for traffic in: {', '.join(correct_geos)}.\n"
+                f"Interested? Please share deal model (CPA/RS/Hybrid), sources, and daily caps so we can launch fast."
+            )
+
+            # 3 сообщение
+            await message.reply(
+                "- If anything looks off or a link doesn’t work, ping @racketwoman.\n"
+                "Great to (e-)meet you — have a fantastic day! 🙌"
+            )
+
+            # 4 сообщение – контакты по GEO
+            await message.reply("\n".join(reply_parts))
+
         logger.info(f"GEO processed for {message.from_user.id}: {correct_geos}")
 
     except Exception as e:
         logger.error(f"Error processing GEOs: {e}")
-        await message.reply("❌ An error occurred while processing your request. Please try again later.")
+        await message.reply("❌ An error occurred while processing your request. Please try again later or ping @racketwoman.")
 
 # Export all handlers
 __all__ = [
