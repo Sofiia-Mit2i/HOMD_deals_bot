@@ -11,6 +11,7 @@ from aiohttp import web
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
 
+
 from handlers import (
     cmd_start,
     website_handler,
@@ -19,7 +20,8 @@ from handlers import (
     #geo_button,
     handle_geos,
     normalize_geo,
-    StartFlow
+    StartFlow,
+    get_start_new_request_keyboard
 )
 from handlers.excel import handle_download, handle_messages_download
 from handlers.other import handle_other_message
@@ -64,7 +66,7 @@ try:
 except Exception as e:
     logger.error(f"Failed to connect to Supabase: {str(e)}")
     raise SystemExit(1)
-
+"""
 # Callback для кнопки "Скачать все"
 async def download_all_callback(callback: types.CallbackQuery, supabase):
     user_id = callback.from_user.id
@@ -77,11 +79,13 @@ async def download_all_callback(callback: types.CallbackQuery, supabase):
 
     await callback.answer()  # убрать "часики"
 
+
 # новая версия send_team_excel для callback
 async def send_team_excel_from_callback(callback: types.CallbackQuery, supabase):
-    """
+  
     Скачивание всех таблиц по кнопке "Скачать все"
-    """
+ 
+
     TEAMS = ["Team1", "Team2", "Team3", "Team4", "Team5", "Team6", "Team7"]
     user_id = callback.from_user.id
 
@@ -119,9 +123,9 @@ async def send_team_excel_from_callback(callback: types.CallbackQuery, supabase)
         except Exception as e:
             logging.error(f"Ошибка при экспорте {table_name}: {e}")
             await callback.message.answer(f"❌ Ошибка при экспорте {table_name}")
+"""
 
-
-async def message_handler(message: types.Message):
+async def message_handler(message: types.Message, state: FSMContext):
     """Route messages to appropriate handlers"""
     try:
         text = message.text.strip()
@@ -129,21 +133,53 @@ async def message_handler(message: types.Message):
         
         # Try to normalize as GEOs first
         correct_geos, incorrect_words = normalize_geo(words, COUNTRY_MAP)
-        
+        current_state = await state.get_state()
         # Route to appropriate handler:
         # 1. If we have correct GEOs, handle as GEO message
         # 2. If message is likely not a GEO attempt, handle as other message
         if correct_geos:
-            await handle_geos(message, supabase, COUNTRY_MAP)
+            if current_state is None:
+                # 🔄 если пользователь НЕ в сценарии → заново запускаем флоу
+                await state.set_state(StartFlow.waiting_for_website)
+                await message.answer(
+                    "🔄 You’ve already sent GEOs earlier.\n"
+                    "Please type your Affiliate Website again to start a new request:"
+                )
+                return
+            else:
+                # если он в сценарии → обычная обработка GEO
+                await handle_geos(
+                    message,
+                    supabase,
+                    COUNTRY_MAP
+                )
+                await state.clear()
+
+                # предлагаем кнопку Start New Request
+                await message.answer(
+                    "✅ Request completed!\nWould you like to start a new one?",
+                    reply_markup=get_start_new_request_keyboard()
+                )
+
         elif len(words) > 3 or not any(len(word) == 2 for word in words):
+            # обработка НЕ GEO сообщений
             logger.info(f"Processing other message from user {message.from_user.id}")
             await handle_other_message(message, supabase)
+
         else:
-            # Treat as failed GEO attempt
+            # fallback: если похоже на GEO
             await handle_geos(message, supabase, COUNTRY_MAP)
+            await state.clear()
+
+            # снова кнопка
+            await message.answer(
+                "✅ Request completed!\nWould you like to start a new one?",
+                reply_markup=get_start_new_request_keyboard()
+            )
+
     except Exception as e:
         logger.error(f"Error in message_handler: {str(e)}")
-        await message.reply("An error occurred while processing your message.")
+        await message.reply("❌ An error occurred while processing your message. Please try again later or ping @racketwoman.")
 
 async def geo_handler_wrapper(message: types.Message, state: FSMContext):
     await geo_handler(message, state, supabase, COUNTRY_MAP)

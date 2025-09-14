@@ -16,6 +16,13 @@ class StartFlow(StatesGroup):
     waiting_for_brand = State()
     waiting_for_geo = State()
 
+def get_start_new_request_keyboard():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Start New Request", callback_data="start_new_request")]
+        ]
+    )
+
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.set_state(StartFlow.waiting_for_website)
     keyboard = InlineKeyboardMarkup(
